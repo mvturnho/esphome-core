@@ -57,6 +57,9 @@ class BinarySensorMap : public Sensor, public Component {
   bool last_touched_{false};
   // this gives max 46 channels per binary_sensor_map
   uint64_t last_mask_{0x00};
+  uint32_t last_position_{0};
+  uint32_t max_value_{255};
+  uint32_t scale_{10};
   /**
    * methods to process the types of binary_sensor_maps
    * GROUP: process_group_() just map to a value
@@ -64,6 +67,7 @@ class BinarySensorMap : public Sensor, public Component {
    * WHEEL: process_wheel_() actuation should be in circular order - NOT IMPLEMENTED YET
    * */
   void process_group_();
+  void process_slider_();
 };
 
 }  // namespace sensor

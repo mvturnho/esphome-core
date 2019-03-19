@@ -24,6 +24,9 @@ void BinarySensorMap::loop() {
     case BINARY_SENSOR_MAP_TYPE_GROUP:
       this->process_group_();
       break;
+    case BINARY_SENSOR_MAP_TYPE_SLIDER:
+      this->process_slider_();
+      break;
   }
 }
 
@@ -62,6 +65,82 @@ void BinarySensorMap::process_group_() {
       this->publish_state(NAN);
     }
   }
+}
+
+void BinarySensorMap::process_slider_() {
+  uint64_t sensor_sum = 0;
+  uint8_t max_index = 0;
+  uint8_t non0_cnt = 0;
+  uint32_t slide_pos_temp = this->last_position_;
+  float pos = 0;
+  for (int i = 0; i < this->sensors_.size(); i++) {
+    if (i >= 2) {
+      // find the max sum of three continuous values
+      uint64_t neb_sum = this->sensors_[i - 2]->binary_sensor->state + this->sensors_[i - 1]->binary_sensor->state +
+                         this->sensors_[i]->binary_sensor->state;
+      if (neb_sum > sensor_sum) {
+        // val_sum is the max value of neb_sum
+        sensor_sum = neb_sum;
+        max_index = i - 1;
+        // Check the zero data number.
+        non0_cnt = 0;
+        for (int j = i - 2; j <= i; j++) {
+          non0_cnt += (this->sensors_[j]->binary_sensor->state) ? 1 : 0;
+        }
+      }
+    }
+  }
+  if (non0_cnt == 0) {
+    // if the max value of neb_sum is zero, no pad is touched
+    // slide_pos_temp = SLIDE_POS_INF;
+  } else if (non0_cnt == 1) {  // only touch one pad
+    // Check the active button number.
+    uint8_t no_zero = 0;
+    for (int i = 0; i < this->sensors_.size(); i++) {
+      if (this->sensors_[i]->binary_sensor->state) {
+        no_zero++;
+      }
+    }
+    // if (no_zero > non0_cnt), May be duplex slider board. TOUCHPAD_DUPLEX_SLIDER.
+    // If duplex slider board, should not identify one button touched.
+    if (no_zero <= non0_cnt) {  // Linear slider. TOUCHPAD_LINEAR_SLIDER
+      for (int i = max_index - 1; i <= max_index + 1; i++) {
+        if (this->sensors_[i]->binary_sensor->state) {
+          if (i == this->sensors_.size() - 1) {
+            slide_pos_temp = this->max_value_;
+          } else {
+            slide_pos_temp = (uint32_t)(i * this->scale_);
+          }
+          break;
+        }
+      }
+    }
+  } else if (non0_cnt == 2) {  // Only touch two pad
+    if (!this->sensors_[max_index - 1]) {
+      // return the corresponding position.
+      pos = ((max_index + 1) * this->sensors_[max_index + 1]->binary_sensor->state +
+             (max_index) * this->sensors_[max_index]->binary_sensor->state) *
+            this->scale_;
+      slide_pos_temp = (uint32_t)(pos / sensor_sum);
+    } else if (!this->sensors_[max_index + 1]) {
+      // return the corresponding position.
+      pos = ((max_index - 1) * this->sensors_[max_index - 1]->binary_sensor->state +
+             (max_index) * this->sensors_[max_index]->binary_sensor->state) *
+            this->scale_;
+      slide_pos_temp = (uint32_t)(pos / sensor_sum);
+    } else {
+      // slide_pos_temp = tp_slide->slide_pos;
+    }
+  } else {
+    // return the corresponding position.
+    pos = ((max_index - 1) * this->sensors_[max_index - 1]->binary_sensor->state +
+           (max_index) * this->sensors_[max_index]->binary_sensor->state +
+           (max_index + 1) * this->sensors_[max_index + 1]->binary_sensor->state) *
+          this->scale_;
+    slide_pos_temp = (uint32_t)(pos / sensor_sum);
+  }
+  ESP_LOGD(TAG, "%s - slider pos: %f", this->name_.c_str(), pos);
+  this->publish_state(pos);
 }
 
 float BinarySensorMap::get_setup_priority() const { return setup_priority::HARDWARE_LATE; }
