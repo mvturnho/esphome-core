@@ -46,6 +46,7 @@ TTP229Channel *TTP229LSFComponent::add_channel(binary_sensor::TTP229Channel *cha
   return channel;
 }
 
+
 void TTP229LSFComponent::process_(uint16_t *data) {
   for (auto *channel : this->channels_) {
     channel->process(data);
