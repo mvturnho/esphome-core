@@ -49,6 +49,7 @@ class BinarySensorMap : public Sensor, public Component {
    * @param value  The value this binary_sensor represents
    */
   void add_sensor(binary_sensor::BinarySensor *sensor, float value);
+  void add_sensor(binary_sensor::BinarySensor *sensor);
   void set_sensor_type(uint8_t sensor_type);
 
  protected:
@@ -57,7 +58,8 @@ class BinarySensorMap : public Sensor, public Component {
   bool last_touched_{false};
   // this gives max 46 channels per binary_sensor_map
   uint64_t last_mask_{0x00};
-  uint32_t last_position_{0};
+  // uint32_t last_position_{0};
+  uint8_t num_channels_{1};
   uint32_t max_value_{255};
   uint32_t scale_{10};
   /**
@@ -68,6 +70,7 @@ class BinarySensorMap : public Sensor, public Component {
    * */
   void process_group_();
   void process_slider_();
+  int32_t get_position_();
 };
 
 }  // namespace sensor

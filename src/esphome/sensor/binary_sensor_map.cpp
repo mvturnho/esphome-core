@@ -3,7 +3,7 @@
 #ifdef USE_BINARY_SENSOR_MAP
 
 #include "esphome/sensor/binary_sensor_map.h"
-
+#include "esphome/helpers.h"
 #include "esphome/log.h"
 
 ESPHOME_NAMESPACE_BEGIN
@@ -68,88 +68,46 @@ void BinarySensorMap::process_group_() {
 }
 
 void BinarySensorMap::process_slider_() {
-  uint64_t sensor_sum = 0;
-  uint8_t max_index = 0;
-  uint8_t non0_cnt = 0;
-  uint32_t slide_pos_temp = this->last_position_;
-  float pos = 0;
-  for (int i = 0; i < this->sensors_.size(); i++) {
-    if (i >= 2) {
-      // find the max sum of three continuous values
-      uint64_t neb_sum = this->sensors_[i - 2]->binary_sensor->state + this->sensors_[i - 1]->binary_sensor->state +
-                         this->sensors_[i]->binary_sensor->state;
-      if (neb_sum > sensor_sum) {
-        // val_sum is the max value of neb_sum
-        sensor_sum = neb_sum;
-        max_index = i - 1;
-        // Check the zero data number.
-        non0_cnt = 0;
-        for (int j = i - 2; j <= i; j++) {
-          non0_cnt += (this->sensors_[j]->binary_sensor->state) ? 1 : 0;
-        }
-      }
+  int32_t pos = this->get_position_();
+  //  ESP_LOGD(TAG, "%d ", pos);
+  //  if (last_touched_ ) {
+  //    ESP_LOGD(TAG, "%d ", pos);
+  // this->publish_state(pos);
+  //    this->last_position_ = pos;
+  //}
+}
+
+int32_t BinarySensorMap::get_position_() {
+  this->last_touched_ = false;
+  float val = 0;
+  uint8_t num_channels = 0;
+  uint8_t channel_index = 0;
+  for (auto *bs : this->sensors_) {
+    if (bs->binary_sensor->state) {
+      this->last_touched_ = true;
+      val += bs->sensor_value;
+      num_channels++;
+    } else if (this->last_touched_) {
+      ESP_LOGD(TAG, "%.2f, %.2f", val, (float) val / num_channels);
+      return val / num_channels;
     }
   }
-  if (non0_cnt == 0) {
-    // if the max value of neb_sum is zero, no pad is touched
-    // slide_pos_temp = SLIDE_POS_INF;
-  } else if (non0_cnt == 1) {  // only touch one pad
-    // Check the active button number.
-    uint8_t no_zero = 0;
-    for (int i = 0; i < this->sensors_.size(); i++) {
-      if (this->sensors_[i]->binary_sensor->state) {
-        no_zero++;
-      }
-    }
-    // if (no_zero > non0_cnt), May be duplex slider board. TOUCHPAD_DUPLEX_SLIDER.
-    // If duplex slider board, should not identify one button touched.
-    if (no_zero <= non0_cnt) {  // Linear slider. TOUCHPAD_LINEAR_SLIDER
-      for (int i = max_index - 1; i <= max_index + 1; i++) {
-        if (this->sensors_[i]->binary_sensor->state) {
-          if (i == this->sensors_.size() - 1) {
-            slide_pos_temp = this->max_value_;
-          } else {
-            slide_pos_temp = (uint32_t)(i * this->scale_);
-          }
-          break;
-        }
-      }
-    }
-  } else if (non0_cnt == 2) {  // Only touch two pad
-    if (!this->sensors_[max_index - 1]) {
-      // return the corresponding position.
-      pos = ((max_index + 1) * this->sensors_[max_index + 1]->binary_sensor->state +
-             (max_index) * this->sensors_[max_index]->binary_sensor->state) *
-            this->scale_;
-      slide_pos_temp = (uint32_t)(pos / sensor_sum);
-    } else if (!this->sensors_[max_index + 1]) {
-      // return the corresponding position.
-      pos = ((max_index - 1) * this->sensors_[max_index - 1]->binary_sensor->state +
-             (max_index) * this->sensors_[max_index]->binary_sensor->state) *
-            this->scale_;
-      slide_pos_temp = (uint32_t)(pos / sensor_sum);
-    } else {
-      // slide_pos_temp = tp_slide->slide_pos;
-    }
-  } else {
-    // return the corresponding position.
-    pos = ((max_index - 1) * this->sensors_[max_index - 1]->binary_sensor->state +
-           (max_index) * this->sensors_[max_index]->binary_sensor->state +
-           (max_index + 1) * this->sensors_[max_index + 1]->binary_sensor->state) *
-          this->scale_;
-    slide_pos_temp = (uint32_t)(pos / sensor_sum);
-  }
-  ESP_LOGD(TAG, "%s - slider pos: %f", this->name_.c_str(), pos);
-  this->publish_state(pos);
+  return 0;
 }
 
 float BinarySensorMap::get_setup_priority() const { return setup_priority::HARDWARE_LATE; }
 
 void BinarySensorMap::add_sensor(binary_sensor::BinarySensor *sensor, float value) {
+  ESP_LOGD(TAG, "add sensor value %.0f", value);
   BinarySensorMapChannel *sensor_channel = new BinarySensorMapChannel;
   sensor_channel->binary_sensor = sensor;
   sensor_channel->sensor_value = value;
   this->sensors_.push_back(sensor_channel);
+}
+
+void BinarySensorMap::add_sensor(binary_sensor::BinarySensor *sensor) {
+  float value = (float) this->num_channels_++;
+  this->add_sensor(sensor, value);
 }
 
 void BinarySensorMap::set_sensor_type(uint8_t sensor_type) { this->sensor_type_ = sensor_type; }
