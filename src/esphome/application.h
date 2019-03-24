@@ -48,6 +48,7 @@
 #include "esphome/display/nextion.h"
 #include "esphome/display/ssd1306.h"
 #include "esphome/display/waveshare_epaper.h"
+#include "esphome/display/ili9341.h"
 #include "esphome/fan/basic_fan_component.h"
 #include "esphome/fan/fan_state.h"
 #include "esphome/fan/mqtt_fan_component.h"
@@ -325,6 +326,12 @@ class Application {
                                                          const GPIOOutputPin &dc_pin,
                                                          display::WaveshareEPaperTypeBModel model,
                                                          uint32_t update_interval = 10000);
+#endif
+
+#ifdef USE_ILI9341
+  display::ILI9341TypeA *make_ili9341_type_a(SPIComponent *parent, const GPIOOutputPin &cs, const GPIOOutputPin &dc_pin,
+                                             display::ILI9341TypeAModel model, uint32_t update_interval = 10000);
+
 #endif
 
 #ifdef USE_NEXTION

@@ -971,6 +971,14 @@ display::WaveshareEPaper *Application::make_waveshare_epaper_type_b(SPIComponent
 }
 #endif
 
+#ifdef USE_ILI9341
+display::ILI9341TypeA *Application::make_ili9341_type_a(SPIComponent *parent, const GPIOOutputPin &cs,
+                                                        const GPIOOutputPin &dc_pin, display::ILI9341TypeAModel model,
+                                                        uint32_t update_interval) {
+  return this->register_component(new display::ILI9341TypeA(parent, cs.copy(), dc_pin.copy(), model, update_interval));
+}
+#endif
+
 #ifdef USE_DISPLAY
 display::Font *Application::make_font(std::vector<display::Glyph> &&glyphs, int baseline, int bottom) {
   return new display::Font(std::move(glyphs), baseline, bottom);
