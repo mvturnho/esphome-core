@@ -239,6 +239,13 @@ void ILI9341TypeA::setup() {
         delay(150);
     }
   }
+
+  ledcSetup(BLK_PWM_CHANNEL, 10000, 8);
+  ledcAttachPin(TFT_LED_PIN, BLK_PWM_CHANNEL);
+  ledcWrite(BLK_PWM_CHANNEL, 80);
+
+  draw_pixel_at(10,10,100);
+  filled_circle(50,50,40,COLOR_ON);
 }
 
 void ILI9341TypeA::dump_config() {

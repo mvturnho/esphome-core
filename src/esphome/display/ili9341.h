@@ -11,6 +11,15 @@
 ESPHOME_NAMESPACE_BEGIN
 
 namespace display {
+#define TFT_LED_PIN 32
+#define TFT_DC_PIN 27
+#define TFT_CS_PIN 14
+#define TFT_MOSI_PIN 23
+#define TFT_CLK_PIN 18
+#define TFT_RST_PIN 33
+#define TFT_MISO_PIN 19
+
+#define BLK_PWM_CHANNEL 7
 
 #define ILI9341_TFTWIDTH 240   ///< ILI9341 max TFT width
 #define ILI9341_TFTHEIGHT 320  ///< ILI9341 max TFT height
