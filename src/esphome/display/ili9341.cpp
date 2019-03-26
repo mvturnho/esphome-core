@@ -179,23 +179,14 @@ void ILI9341::update() {
   this->do_update_();
   this->display();
 }
-void ILI9341::fill(int color) {
-  // flip logic
-  const uint8_t fill = color ? 0x00 : 0xFF;
-  for (uint32_t i = 0; i < this->get_buffer_length_(); i++)
-    this->buffer_[i] = fill;
-}
+
 void HOT ILI9341::draw_absolute_pixel_internal(int x, int y, int color) {
   if (x >= this->get_width_internal() || y >= this->get_height_internal() || x < 0 || y < 0)
     return;
 
   const uint32_t pos = (x + y * this->get_width_internal()) / 8u;
-  const uint8_t subpos = x & 0x07;
-  // flip logic
-  if (!color)
-    this->buffer_[pos] |= 0x80 >> subpos;
-  else
-    this->buffer_[pos] &= ~(0x80 >> subpos);
+  // const uint8_t subpos = x & 0x07;
+  this->buffer_[pos] = color;
 }
 uint32_t ILI9341::get_buffer_length_() { return this->get_width_internal() * this->get_height_internal() / 8u; }
 ILI9341::ILI9341(SPIComponent *parent, GPIOPin *cs, GPIOPin *dc_pin, uint32_t update_interval)
@@ -212,19 +203,38 @@ void ILI9341::start_data_() {
 }
 void ILI9341::end_data_() { this->disable(); }
 
+void ILI9341::set_address_(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2) {
+  this->command(0x2A);
+  this->start_data_();
+  this->write_byte(x1 >> 8);
+  this->write_byte(x1);
+  this->write_byte(x2 >> 8);
+  this->write_byte(x2);
+  this->end_data_();
+
+  this->command(0x2B);
+  this->start_data_();
+  this->write_byte(y1 >> 8);
+  this->write_byte(y1);
+  this->write_byte(y2 >> 8);
+  this->write_byte(y2);
+  this->end_data_();
+
+  this->command(0x2C);  // meory write
+}
+
 // ========================================================
 //                          Type A
 // ========================================================
 ILI9341TypeA::ILI9341TypeA(SPIComponent *parent, GPIOPin *cs, GPIOPin *dc_pin, uint32_t update_interval)
     : ILI9341(parent, cs, dc_pin, update_interval) {}
-void ILI9341TypeA::set_full_update_every(uint32_t full_update_every) { this->full_update_every_ = full_update_every; }
 
 void ILI9341TypeA::setup() {
   uint8_t cmd, x, numArgs;
   const uint8_t *addr = init_cmd;
   this->setup_pins_();
 
-  this->start_command_();
+  // this->start_command_();
   if (this->reset_pin_ < 0) {
     this->command(ILI9341_SWRESET);
     delay(150);
@@ -233,115 +243,63 @@ void ILI9341TypeA::setup() {
     this->command(cmd);
     x = pgm_read_byte(addr++);
     numArgs = x & 0x7F;
+    this->start_data_();
     while (numArgs--) {
-      this->data(pgm_read_byte(addr++));
+      this->write_byte(pgm_read_byte(addr++));
       if (x & 0x80)
         delay(150);
     }
+    this->end_data_();
   }
 
-  ledcSetup(BLK_PWM_CHANNEL, 10000, 8);
-  ledcAttachPin(TFT_LED_PIN, BLK_PWM_CHANNEL);
-  ledcWrite(BLK_PWM_CHANNEL, 80);
+  this->command(ILI9341_MADCTL);
+  this->data(MADCTL_BGR);
 
-  draw_pixel_at(10,10,100);
-  filled_circle(50,50,40,COLOR_ON);
+  // ledcSetup(BLK_PWM_CHANNEL, 10000, 8);
+  // ledcAttachPin(TFT_LED_PIN, BLK_PWM_CHANNEL);
+  // ledcWrite(BLK_PWM_CHANNEL, 80);
 }
 
 void ILI9341TypeA::dump_config() {
-  LOG_DISPLAY("", "Waveshare E-Paper", this);
-  switch (this->model_) {
-    case ILI9341_1_54_IN:
-      ESP_LOGCONFIG(TAG, "  Model: 1.54in");
-      break;
-    case ILI9341_2_13_IN:
-      ESP_LOGCONFIG(TAG, "  Model: 2.13in");
-      break;
-    case ILI9341_2_9_IN:
-      ESP_LOGCONFIG(TAG, "  Model: 2.9in");
-      break;
-  }
-  ESP_LOGCONFIG(TAG, "  Full Update Every: %u", this->full_update_every_);
+  LOG_DISPLAY("", "ILI9341 ", this);
   LOG_PIN("  Reset Pin: ", this->reset_pin_);
   LOG_PIN("  DC Pin: ", this->dc_pin_);
   LOG_PIN("  Busy Pin: ", this->busy_pin_);
   LOG_UPDATE_INTERVAL(this);
 }
 void HOT ILI9341TypeA::display() {
-  if (!this->wait_until_idle_()) {
-    this->status_set_warning();
-    return;
+  ESP_LOGD(TAG, "update display");
+  ESP_LOGD(TAG, "width:%d height:%d", this->get_width_internal(), this->get_height_internal());
+  this->fill(0x0000);
+  uint16_t red = 0xF800;
+  this->line(10, 10, 100, 200, red);
+  for (uint16_t x = 0; x < this->width_; x++) {
+    this->set_address_(x, x, x + 1, x + 1);
+    this->data(red >> 8);
+    this->data(red);
+    this->set_address_(x + 1, x, x + 2, x + 1);
+    this->data(red >> 8);
+    this->data(red);
   }
 
-  if (this->full_update_every_ >= 2) {
-    bool prev_full_update = this->at_update_ == 1;
-    bool full_update = this->at_update_ == 0;
-    // if (full_update != prev_full_update) {
-    //   this->write_lut_(full_update ? FULL_UPDATE_LUT : PARTIAL_UPDATE_LUT);
-    // }
-    this->at_update_ = (this->at_update_ + 1) % this->full_update_every_;
+  // if (!this->wait_until_idle_()) {
+  for (uint16_t y = 0; y < this->get_height_internal(); y++) {
+    for (uint16_t x = 0; x < this->get_width_internal(); x++) {
+      uint16_t pixel_data = this->buffer_[x + y * this->get_width_internal()];
+      this->set_address_(x, x, x + 1, x + 1);
+      this->data(pixel_data >> 8);
+      this->data(pixel_data);
+      feed_wdt();
+    }
   }
 
-  // Set x & y regions we want to write to (full)
-  // this->command(ILI9341_COMMAND_SET_RAM_X_ADDRESS_START_END_POSITION);
-  this->data(0x00);
-  this->data((this->get_width_internal() - 1) >> 3);
-  // this->command(ILI9341_COMMAND_SET_RAM_Y_ADDRESS_START_END_POSITION);
-  this->data(0x00);
-  this->data(0x00);
-  this->data(this->get_height_internal() - 1);
-  this->data((this->get_height_internal() - 1) >> 8);
-
-  // this->command(ILI9341_COMMAND_SET_RAM_X_ADDRESS_COUNTER);
-  this->data(0x00);
-  // this->command(ILI9341_COMMAND_SET_RAM_Y_ADDRESS_COUNTER);
-  this->data(0x00);
-  this->data(0x00);
-
-  if (!this->wait_until_idle_()) {
-    this->status_set_warning();
-    return;
-  }
-
-  // this->command(ILI9341_COMMAND_WRITE_RAM);
-  this->start_data_();
-  this->write_array(this->buffer_, this->get_buffer_length_());
-  this->end_data_();
-
-  // this->command(ILI9341_COMMAND_DISPLAY_UPDATE_CONTROL_2);
-  this->data(0xC4);
-  // this->command(ILI9341_COMMAND_MASTER_ACTIVATION);
-  // this->command(ILI9341_COMMAND_TERMINATE_FRAME_READ_WRITE);
+  ESP_LOGD(TAG, "done");
 
   this->status_clear_warning();
+  return;
 }
-int ILI9341TypeA::get_width_internal() {
-  switch (this->model_) {
-    case ILI9341_1_54_IN:
-      return 200;
-    case ILI9341_2_13_IN:
-      return 128;
-    case ILI9341_2_9_IN:
-      return 128;
-  }
-  return 0;
-}
-int ILI9341TypeA::get_height_internal() {
-  switch (this->model_) {
-    case ILI9341_1_54_IN:
-      return 200;
-    case ILI9341_2_13_IN:
-      return 250;
-    case ILI9341_2_9_IN:
-      return 296;
-  }
-  return 0;
-}
-void ILI9341TypeA::write_lut_(const uint8_t *lut) {
-  // this->command(ILI9341_COMMAND_WRITE_LUT_REGISTER);
-  for (uint8_t i = 0; i < 30; i++)
-    this->data(lut[i]);
-}
+int ILI9341TypeA::get_width_internal() { return width_; }
+int ILI9341TypeA::get_height_internal() { return height_; }
 
 }  // namespace display
 

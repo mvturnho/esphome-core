@@ -78,6 +78,14 @@ namespace display {
 #define ILI9341_GMCTRP1 0xE0  ///< Positive Gamma Correction
 #define ILI9341_GMCTRN1 0xE1  ///< Negative Gamma Correction
 
+#define MADCTL_MY 0x80   ///< Bottom to top
+#define MADCTL_MX 0x40   ///< Right to left
+#define MADCTL_MV 0x20   ///< Reverse Mode
+#define MADCTL_ML 0x10   ///< LCD refresh Bottom to top
+#define MADCTL_RGB 0x00  ///< Red-Green-Blue pixel order
+#define MADCTL_BGR 0x08  ///< Blue-Green-Red pixel order
+#define MADCTL_MH 0x04   ///< LCD refresh right to left
+
 class ILI9341 : public PollingComponent, public SPIDevice, public DisplayBuffer {
  public:
   ILI9341(SPIComponent *parent, GPIOPin *cs, GPIOPin *dc_pin, uint32_t update_interval);
@@ -88,62 +96,39 @@ class ILI9341 : public PollingComponent, public SPIDevice, public DisplayBuffer 
   bool is_device_msb_first() override;
   void command(uint8_t value);
   void data(uint8_t value);
-
   virtual void display() = 0;
-
   void update() override;
-
-  void fill(int color) override;
 
  protected:
   void draw_absolute_pixel_internal(int x, int y, int color) override;
-
   bool wait_until_idle_();
-
   void setup_pins_();
-
   uint32_t get_buffer_length_();
-
   bool is_device_high_speed() override;
-
   void start_command_();
   void end_command_();
   void start_data_();
   void end_data_();
+  void set_address_(uint16_t x1, uint16_t y1, uint16_t x2,  uint16_t y2);
 
   GPIOPin *reset_pin_{nullptr};
   GPIOPin *dc_pin_;
   GPIOPin *busy_pin_{nullptr};
 };
 
-enum ILI9341TypeAModel {
-  ILI9341_1_54_IN = 0,
-  ILI9341_2_13_IN,
-  ILI9341_2_9_IN,
-};
-
 class ILI9341TypeA : public ILI9341 {
  public:
   ILI9341TypeA(SPIComponent *parent, GPIOPin *cs, GPIOPin *dc_pin, uint32_t update_interval);
-
   void setup() override;
-
   void dump_config() override;
-
   void display() override;
 
-  void set_full_update_every(uint32_t full_update_every);
-
  protected:
-  void write_lut_(const uint8_t *lut);
-
   int get_width_internal() override;
-
   int get_height_internal() override;
-
-  uint32_t full_update_every_{30};
   uint32_t at_update_{0};
-  ILI9341TypeAModel model_;
+  int width_{ILI9341_TFTWIDTH};
+  int height_{ILI9341_TFTHEIGHT};
 };
 
 }  // namespace display
