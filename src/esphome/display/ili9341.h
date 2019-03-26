@@ -109,7 +109,7 @@ class ILI9341 : public PollingComponent, public SPIDevice, public DisplayBuffer 
   void end_command_();
   void start_data_();
   void end_data_();
-  void set_address_(uint16_t x1, uint16_t y1, uint16_t x2,  uint16_t y2);
+  void set_address_(uint16_t x1, uint16_t y1);
 
   GPIOPin *reset_pin_{nullptr};
   GPIOPin *dc_pin_;
