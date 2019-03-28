@@ -180,15 +180,19 @@ void ILI9341::update() {
   this->display();
 }
 
-// here we decide how pixel data lands in the buffer.
-// in dtsplay we should retreive as we stored the data.
+//here we decide how pixel data lands in the buffer.
+//in dtsplay we should retreive as we stored the data.
 void HOT ILI9341::draw_absolute_pixel_internal(int x, int y, int color) {
   if (x >= this->get_width_internal() || y >= this->get_height_internal() || x < 0 || y < 0)
     return;
 
-  const uint32_t pos = (x + (y * this->get_width_internal())) / 8u;
-  // const uint8_t subpos = x & 0x07;
-  this->buffer_[pos] = color;
+  uint16_t pos = x + (y / 8) * this->get_width_internal();
+  uint8_t subpos = y & 0x07;
+  if (color) {
+    this->buffer_[pos] |= (color << subpos);
+  } else {
+    this->buffer_[pos] &= ~(color << subpos);
+  }
 }
 uint32_t ILI9341::get_buffer_length_() { return this->get_width_internal() * this->get_height_internal() / 8u; }
 ILI9341::ILI9341(SPIComponent *parent, GPIOPin *cs, GPIOPin *dc_pin, uint32_t update_interval)
@@ -205,24 +209,24 @@ void ILI9341::start_data_() {
 }
 void ILI9341::end_data_() { this->disable(); }
 
-void ILI9341::set_address_(uint16_t x, uint16_t y) {
+void ILI9341::set_address_(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2) {
   this->command(0x2A);
   this->start_data_();
-  this->write_byte(x >> 8);
-  this->write_byte(x);
-  this->write_byte((x + 1) >> 8);
-  this->write_byte(x + 1);
+  this->write_byte(x1 >> 8);
+  this->write_byte(x1);
+  this->write_byte(x2 >> 8);
+  this->write_byte(x2);
   this->end_data_();
 
   this->command(0x2B);
   this->start_data_();
-  this->write_byte(y >> 8);
-  this->write_byte(y);
-  this->write_byte((y + 1) >> 8);
-  this->write_byte(y + 1);
+  this->write_byte(y1 >> 8);
+  this->write_byte(y1);
+  this->write_byte(y2 >> 8);
+  this->write_byte(y2);
   this->end_data_();
 
-  this->command(0x2C);  // write
+  this->command(0x2C);  // meory write
 }
 
 // ========================================================
@@ -276,19 +280,24 @@ void HOT ILI9341TypeA::display() {
   uint8_t red = 0xF8;
   this->line(10, 10, 100, 200, red);
   for (uint16_t x = 0; x < this->width_; x++) {
-    this->set_address_(x, x);
+    this->set_address_(x, x, x + 1, x + 1);
     this->data(red >> 8);
     this->data(red);
-    this->set_address_(x + 1, x);
+    this->set_address_(x + 1, x, x + 2, x + 1);
     this->data(red >> 8);
     this->data(red);
   }
 
   // if (!this->wait_until_idle_()) {
+    //panic result.
+  //set the adress window to write to
+  this->set_address_(0,0,this->get_width_internal(), this->get_height_internal());
+  //start write ram command
+  this->command(ILI9341_RAMWR); 
+  //wrx < this->get_width_internal() / 16
   for (uint16_t y = 0; y < this->get_height_internal(); y++) {
-    for (uint16_t x = 0; x < this->get_width_internal(); x++) {
-      uint16_t pixel_data = this->buffer_[x + (y * this->get_width_internal())] / 8u;
-      this->set_address_(x, y);
+    for (uint16_t x = 0; x < this->get_width_internal() / 16; x++) {
+      uint16_t pixel_data = this->buffer_[x + (y * this->get_width_internal())];
       this->data(pixel_data >> 8);
       this->data(pixel_data);
       feed_wdt();
