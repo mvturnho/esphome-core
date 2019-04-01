@@ -56,8 +56,15 @@ class MPR121Channel : public binary_sensor::BinarySensor {
  public:
   MPR121Channel(const std::string &name, int channel_num = 0);
   void process(const uint16_t *data, const uint16_t *last_data);
+  int get_channel();
+  void set_touch_threshold(uint8_t touch_threshold);
+  void set_release_threshold(uint8_t release_threshold);
+  uint8_t get_touch_threshold();
+  uint8_t get_release_threshold();
 
  protected:
+  uint8_t touch_threshold_{12};
+  uint8_t release_threshold{6};
   int channel_ = 0;
 };
 
@@ -67,8 +74,8 @@ class MPR121Component : public Component, public I2CDevice {
   binary_sensor::MPR121Channel *add_channel(binary_sensor::MPR121Channel *channel);
   binary_sensor::MPR121Channel *add_channel(const std::string &name, uint8_t channel_number);
   sensor::MPR121Sensor *make_sensor(const std::string &name);
-  void set_touch_threshold(uint8_t touch_threshold, uint8_t channel);
-  void set_release_threshold(uint8_t release_threshold, uint8_t channel);
+  void set_touch_debounce(uint8_t debounce);
+  void set_release_debounce(uint8_t debounce);
   void setup() override;
   void dump_config() override;
   float get_setup_priority() const override;
@@ -77,8 +84,9 @@ class MPR121Component : public Component, public I2CDevice {
  protected:
   std::vector<MPR121Channel *> channels_{};
   std::vector<sensor::MPR121Sensor *> sensors_{};
-  uint16_t lasttouched_ = 0;
-  uint16_t currtouched_ = 0;
+  uint16_t lasttouched_{0};
+  uint16_t currtouched_{0};
+  uint8_t debounce_{0};
   enum ErrorCode {
     NONE = 0,
     COMMUNICATION_FAILED,

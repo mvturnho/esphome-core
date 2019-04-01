@@ -21,6 +21,16 @@ void MPR121Channel::process(const uint16_t *data, const uint16_t *last_data) {
   }
 }
 
+int MPR121Channel::get_channel() { return this->channel_; }
+
+void MPR121Channel::set_touch_threshold(uint8_t touch_threshold) { this->touch_threshold_ = touch_threshold; }
+
+void MPR121Channel::set_release_threshold(uint8_t release_threshold) { this->release_threshold = release_threshold; }
+
+uint8_t MPR121Channel::get_touch_threshold() { return this->touch_threshold_; }
+
+uint8_t MPR121Channel::get_release_threshold() { return this->release_threshold; }
+
 MPR121Component::MPR121Component(I2CComponent *parent, uint8_t address) : I2CDevice(parent, address) {}
 
 sensor::MPR121Sensor *MPR121Component::make_sensor(const std::string &name) {
@@ -39,11 +49,9 @@ void MPR121Component::setup() {
     this->mark_failed();
     return;
   }
-
-  // set touch sensitivity for all 12 channels
-  for (uint8_t i = 0; i < 12; i++) {
-    this->write_byte(MPR121_TOUCHTH_0 + 2 * i, 12);
-    this->write_byte(MPR121_RELEASETH_0 + 2 * i, 6);
+  for (auto *channel : this->channels_) {
+    this->write_byte(MPR121_TOUCHTH_0 + 2 * channel->get_channel(), channel->get_touch_threshold());
+    this->write_byte(MPR121_RELEASETH_0 + 2 * channel->get_channel(), channel->get_release_threshold());
   }
   this->write_byte(MPR121_MHDR, 0x01);
   this->write_byte(MPR121_NHDR, 0x01);
@@ -59,7 +67,7 @@ void MPR121Component::setup() {
   this->write_byte(MPR121_NCLT, 0x00);
   this->write_byte(MPR121_FDLT, 0x00);
 
-  this->write_byte(MPR121_DEBOUNCE, 0);
+  this->write_byte(MPR121_DEBOUNCE, this->debounce_);
   // default, 16uA charge current
   this->write_byte(MPR121_CONFIG1, 0x10);
   // 0.5uS encoding, 1ms period
@@ -96,14 +104,18 @@ MPR121Channel *MPR121Component::add_channel(const std::string &name, uint8_t cha
   return this->add_channel(channel);
 }
 
-void MPR121Component::set_touch_threshold(uint8_t touch_threshold, uint8_t channel) {
-  ESP_LOGD(TAG, "set_touch_threshold -> tt: %d , chan:%d", touch_threshold);
-  this->write_byte(MPR121_TOUCHTH_0 + 2 * channel, touch_threshold);
+void MPR121Component::set_touch_debounce(uint8_t debounce) {
+  uint8_t mask = debounce << 4;
+  this->debounce_ &= 0x0f;
+  this->debounce_ |= mask;
+  ESP_LOGD(TAG, "debounce:%02x", this->debounce_);
 }
-
-void MPR121Component::set_release_threshold(uint8_t release_threshold, uint8_t channel) {
-  this->write_byte(MPR121_RELEASETH_0 + 2 * channel, release_threshold);
-}
+void MPR121Component::set_release_debounce(uint8_t debounce){
+  uint8_t mask = debounce & 0x0f;
+  this->debounce_ &= 0xf0;
+  this->debounce_ |= mask;
+  ESP_LOGD(TAG, "debounce:%02x", this->debounce_);
+};
 
 void MPR121Component::process_(uint16_t *data, uint16_t *last_data) {
   for (auto *channel : this->channels_) {
