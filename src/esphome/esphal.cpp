@@ -201,7 +201,17 @@ void ICACHE_RAM_ATTR ISRInternalGPIOPin::clear_interrupt() {
 }
 GPIOPin *GPIOPin::copy() const { return new GPIOPin(*this); }
 
-void ICACHE_RAM_ATTR HOT GPIOPin::pin_mode(uint8_t mode) { pinMode(this->pin_, mode); }
+void ICACHE_RAM_ATTR HOT GPIOPin::pin_mode(uint8_t mode) {
+#ifdef ARDUINO_ARCH_ESP8266
+  if (this->pin_ == 16 && mode == INPUT_PULLUP) {
+    // pullups are not available on GPIO16, manually override with
+    // input mode.
+    pinMode(16, INPUT);
+    return;
+  }
+#endif
+  pinMode(this->pin_, mode);
+}
 
 GPIOOutputPin::GPIOOutputPin(uint8_t pin, uint8_t mode, bool inverted) : GPIOPin(pin, mode, inverted) {}
 
@@ -256,3 +266,19 @@ ISRInternalGPIOPin *GPIOPin::to_isr() const {
 }
 
 ESPHOME_NAMESPACE_END
+
+#ifdef ARDUINO_ESP8266_RELEASE_2_3_0
+// Fix 2.3.0 std missing memchr
+extern "C" {
+void *memchr(const void *s, int c, size_t n) {
+  if (n == 0)
+    return nullptr;
+  const uint8_t *p = reinterpret_cast<const uint8_t *>(s);
+  do {
+    if (*p++ == c)
+      return const_cast<void *>(reinterpret_cast<const void *>(p - 1));
+  } while (--n != 0);
+  return nullptr;
+}
+};
+#endif

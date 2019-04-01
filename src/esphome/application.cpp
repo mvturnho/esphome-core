@@ -370,11 +370,8 @@ void Application::register_switch(switch_::Switch *a_switch) {
 #endif
 
 #ifdef USE_DALLAS_SENSOR
-DallasComponent *Application::make_dallas_component(ESPOneWire *one_wire, uint32_t update_interval) {
-  return this->register_component(new DallasComponent(one_wire, update_interval));
-}
 DallasComponent *Application::make_dallas_component(const GPIOOutputPin &pin, uint32_t update_interval) {
-  return this->make_dallas_component(new ESPOneWire(pin.copy()), update_interval);
+  return this->register_component(new DallasComponent(new ESPOneWire(pin.copy()), update_interval));
 }
 #endif
 
@@ -1166,6 +1163,12 @@ binary_sensor::MPR121Component *Application::make_mpr121(uint8_t address) {
 }
 #endif
 
+#ifdef USE_TTP229_LSF
+binary_sensor::TTP229LSFComponent *Application::make_ttp229_lsf(uint8_t address) {
+  return this->register_component(new TTP229LSFComponent(this->i2c_, address));
+}
+#endif
+
 #ifdef USE_ULN2003
 stepper::ULN2003 *Application::make_uln2003(const GPIOOutputPin &pin_a, const GPIOOutputPin &pin_b,
                                             const GPIOOutputPin &pin_c, const GPIOOutputPin &pin_d) {
@@ -1190,6 +1193,12 @@ Application::MakePartitionLight Application::make_partition_light(
 #ifdef USE_MCP23017
 io::MCP23017 *Application::make_mcp23017_component(uint8_t address) {
   return this->register_component(new MCP23017(this->i2c_, address));
+}
+#endif
+
+#ifdef USE_SDS011
+sensor::SDS011Component *Application::make_sds011(UARTComponent *parent) {
+  return this->register_component(new SDS011Component(parent));
 }
 #endif
 

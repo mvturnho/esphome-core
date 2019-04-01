@@ -21,6 +21,7 @@
 #include "esphome/log_component.h"
 #include "esphome/ota_component.h"
 #include "esphome/power_supply_component.h"
+#include "esphome/servo.h"
 #include "esphome/spi_component.h"
 #include "esphome/status_led.h"
 #include "esphome/uart_component.h"
@@ -38,6 +39,7 @@
 #include "esphome/binary_sensor/status_binary_sensor.h"
 #include "esphome/binary_sensor/template_binary_sensor.h"
 #include "esphome/binary_sensor/mpr121_sensor.h"
+#include "esphome/binary_sensor/ttp229_lsf_sensor.h"
 #include "esphome/cover/cover.h"
 #include "esphome/cover/mqtt_cover_component.h"
 #include "esphome/cover/template_cover.h"
@@ -64,6 +66,7 @@
 #include "esphome/mqtt/mqtt_client_component.h"
 #include "esphome/mqtt/mqtt_component.h"
 #include "esphome/output/binary_output.h"
+#include "esphome/output/copy_output.h"
 #include "esphome/output/custom_output.h"
 #include "esphome/output/esp8266_pwm_output.h"
 #include "esphome/output/float_output.h"
@@ -126,6 +129,7 @@
 #include "esphome/sensor/ultrasonic_sensor.h"
 #include "esphome/sensor/uptime_sensor.h"
 #include "esphome/sensor/wifi_signal_sensor.h"
+#include "esphome/sensor/sds011_component.h"
 #include "esphome/stepper/a4988.h"
 #include "esphome/stepper/stepper.h"
 #include "esphome/stepper/uln2003.h"
@@ -145,6 +149,7 @@
 #include "esphome/text_sensor/template_text_sensor.h"
 #include "esphome/text_sensor/text_sensor.h"
 #include "esphome/text_sensor/version_text_sensor.h"
+#include "esphome/text_sensor/wifi_info.h"
 #include "esphome/time/rtc_component.h"
 #include "esphome/time/sntp_component.h"
 #include "esphome/time/homeassistant_time.h"
@@ -331,6 +336,9 @@ class Application {
   template<typename T> GlobalVariableComponent<T> *make_global_variable();
 
   template<typename T> GlobalVariableComponent<T> *make_global_variable(T initial_value);
+  template<typename T>
+  GlobalVariableComponent<T> *make_global_variable(
+      std::array<typename std::remove_extent<T>::type, std::extent<T>::value> initial_value);
 
   /*           _    _ _______ ____  __  __       _______ _____ ____  _   _
    *      /\  | |  | |__   __/ __ \|  \/  |   /\|__   __|_   _/ __ \| \ | |
@@ -420,6 +428,10 @@ class Application {
   binary_sensor::MPR121Component *make_mpr121(uint8_t address = 0x5A);
 #endif
 
+#ifdef USE_TTP229_LSF
+  binary_sensor::TTP229LSFComponent *make_ttp229_lsf(uint8_t address = 0x57);
+#endif
+
   /*   ____  _____ _   _ ____   ___  ____
    *  / ___|| ____| \ | / ___| / _ \|  _ \
    *  \___ \|  _| |  \| \___ \| | | | |_) |
@@ -455,8 +467,6 @@ class Application {
 #endif
 
 #ifdef USE_DALLAS_SENSOR
-  sensor::DallasComponent *make_dallas_component(ESPOneWire *one_wire, uint32_t update_interval = 60000);
-
   sensor::DallasComponent *make_dallas_component(const GPIOOutputPin &pin, uint32_t update_interval = 60000);
 #endif
 
@@ -564,12 +574,12 @@ class Application {
    * @param friendly_name The friendly name for this sensor advertised to Home Assistant.
    * @param trigger_pin The pin the short pulse will be sent to, can be integer or GPIOOutputPin.
    * @param echo_pin The pin we wait that we wait on for the echo, can be integer or GPIOInputPin.
-   * @param update_interval The time in ms between updates, defaults to 5 seconds.
+   * @param update_interval The time in ms between updates, defaults to 60 seconds.
    */
   sensor::UltrasonicSensorComponent *make_ultrasonic_sensor(const std::string &friendly_name,
                                                             const GPIOOutputPin &trigger_pin,
                                                             const GPIOInputPin &echo_pin,
-                                                            uint32_t update_interval = 5000);
+                                                            uint32_t update_interval = 60000);
 #endif
 
 #ifdef USE_WIFI_SIGNAL_SENSOR
@@ -818,6 +828,10 @@ class Application {
 
 #ifdef USE_CUSTOM_SENSOR
   sensor::CustomSensorConstructor *make_custom_sensor(const std::function<std::vector<sensor::Sensor *>()> &init);
+#endif
+
+#ifdef USE_SDS011
+  sensor::SDS011Component *make_sds011(UARTComponent *parent);
 #endif
 
   /*    ___  _   _ _____ ____  _   _ _____
@@ -1224,6 +1238,11 @@ template<typename T> GlobalVariableComponent<T> *Application::make_global_variab
 }
 
 template<typename T> GlobalVariableComponent<T> *Application::make_global_variable(T initial_value) {
+  return this->register_component(new GlobalVariableComponent<T>(initial_value));
+}
+template<typename T>
+GlobalVariableComponent<T> *Application::make_global_variable(
+    std::array<typename std::remove_extent<T>::type, std::extent<T>::value> initial_value) {
   return this->register_component(new GlobalVariableComponent<T>(initial_value));
 }
 

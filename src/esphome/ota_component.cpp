@@ -203,7 +203,7 @@ void OTAComponent::handle_() {
     ESP_LOGW(TAG, "Reading features failed!");
     goto error;
   }
-  ota_features = buf[0];
+  ota_features = buf[0];  // NOLINT
   ESP_LOGV(TAG, "OTA features is 0x%02X", ota_features);
 
   // Acknowledge header - 1 byte
@@ -220,7 +220,7 @@ void OTAComponent::handle_() {
     ESP_LOGV(TAG, "Auth: Nonce is %s", sbuf);
 
     // Send nonce, 32 bytes hex MD5
-    if (this->client_.write(sbuf, 32) != 32) {
+    if (this->client_.write(reinterpret_cast<uint8_t *>(sbuf), 32) != 32) {
       ESP_LOGW(TAG, "Auth: Writing nonce failed!");
       goto error;
     }
@@ -311,7 +311,7 @@ void OTAComponent::handle_() {
       goto error;
     }
 #endif
-    ESP_LOGW(TAG, "Preparing OTA partition failed!");
+    ESP_LOGW(TAG, "Preparing OTA partition failed! '%s'", ss.c_str());
     error_code = OTA_RESPONSE_ERROR_UPDATE_PREPARE;
     goto error;
   }
@@ -340,7 +340,7 @@ void OTAComponent::handle_() {
 
     uint32_t written = Update.write(buf, available);
     if (written != available) {
-      ESP_LOGW(TAG, "Error writing binary data to flash: %u != %d!", written, available);
+      ESP_LOGW(TAG, "Error writing binary data to flash: %u != %zu!", written, available);
       error_code = OTA_RESPONSE_ERROR_WRITING_FLASH;
       goto error;
     }
@@ -386,13 +386,18 @@ error:
     ESP_LOGW(TAG, "Update end failed! Error: %s", ss.c_str());
   }
   if (this->client_.connected()) {
-    this->client_.write(error_code);
+    this->client_.write(static_cast<uint8_t>(error_code));
     this->client_.flush();
   }
   this->client_.stop();
 #ifdef ARDUINO_ARCH_ESP32
   if (update_started) {
     Update.abort();
+  }
+#endif
+#ifdef ARDUINO_ARCH_ESP8266
+  if (update_started) {
+    Update.end();
   }
 #endif
   this->status_momentary_error("onerror", 5000);
@@ -442,7 +447,7 @@ size_t OTAComponent::wait_receive_(uint8_t *buf, size_t bytes, bool check_discon
   }
 
   if (!success) {
-    ESP_LOGW(TAG, "Reading %u bytes of binary data failed!", bytes);
+    ESP_LOGW(TAG, "Reading %zu bytes of binary data failed!", bytes);
     return 0;
   }
 

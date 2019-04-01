@@ -1,7 +1,11 @@
 #ifndef ESPHOME_DEFINES_H
 #define ESPHOME_DEFINES_H
 
-#define ESPHOME_VERSION "1.12.0-dev"
+#ifdef ARDUINO_ARCH_ESP8266
+#include <core_version.h>
+#endif
+
+#define ESPHOME_VERSION "1.13.0-dev"
 
 #define HOT __attribute__((hot))
 #define ESPDEPRECATED(msg) __attribute__((deprecated(msg)))
@@ -42,7 +46,9 @@
 #define USE_PCA9685_OUTPUT
 #define USE_GPIO_OUTPUT
 #ifdef ARDUINO_ARCH_ESP8266
+#ifndef ARDUINO_ESP8266_RELEASE_2_3_0
 #define USE_ESP8266_PWM_OUTPUT
+#endif
 #endif
 #define USE_LIGHT
 #define USE_SWITCH
@@ -59,6 +65,7 @@
 #define USE_PCF8574
 #define USE_MCP23017
 #define USE_IO
+#define USE_SDS011
 #define USE_MPU6050
 #define USE_TSL2561
 #define USE_BH1750
@@ -83,6 +90,7 @@
 #define USE_TEMPLATE_COVER
 #ifdef ARDUINO_ARCH_ESP32
 #define USE_ESP32_HALL_SENSOR
+#define USE_ESP32_CAMERA
 #endif
 #define USE_DUTY_CYCLE_SENSOR
 #define USE_STATUS_LED
@@ -135,6 +143,10 @@
 #define USE_APDS9960
 #define USE_MPR121
 #define USE_MQTT
+#define USE_COPY_OUTPUT
+#define USE_WIFI_INFO_TEXT_SENSOR
+#define USE_SERVO
+#define USE_TTP229_LSF
 #endif
 
 #ifdef USE_REMOTE_RECEIVER

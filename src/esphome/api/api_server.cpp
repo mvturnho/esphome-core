@@ -53,6 +53,16 @@ void APIServer::setup() {
   });
 
   this->last_connected_ = millis();
+
+#ifdef USE_ESP32_CAMERA
+  if (global_esp32_camera != nullptr) {
+    global_esp32_camera->add_image_callback([this](std::shared_ptr<CameraImage> image) {
+      for (auto *c : this->clients_)
+        if (!c->remove_)
+          c->send_camera_state(image);
+    });
+  }
+#endif
 }
 void APIServer::loop() {
   // Partition clients into remove and active
@@ -80,8 +90,10 @@ void APIServer::loop() {
         ESP_LOGE(TAG, "No client connected to API. Rebooting...");
         reboot("api");
       }
+      this->status_set_warning();
     } else {
       this->last_connected_ = now;
+      this->status_clear_warning();
     }
   }
 }
@@ -385,6 +397,7 @@ void APIConnection::read_message_(uint32_t size, uint32_t type, uint8_t *msg) {
     case APIMessageType::LIST_ENTITIES_SWITCH_RESPONSE:
     case APIMessageType::LIST_ENTITIES_TEXT_SENSOR_RESPONSE:
     case APIMessageType::LIST_ENTITIES_SERVICE_RESPONSE:
+    case APIMessageType::LIST_ENTITIES_CAMERA_RESPONSE:
     case APIMessageType::LIST_ENTITIES_DONE_RESPONSE:
       // Invalid
       break;
@@ -401,6 +414,7 @@ void APIConnection::read_message_(uint32_t size, uint32_t type, uint8_t *msg) {
     case APIMessageType::SENSOR_STATE_RESPONSE:
     case APIMessageType::SWITCH_STATE_RESPONSE:
     case APIMessageType::TEXT_SENSOR_STATE_RESPONSE:
+    case APIMessageType::CAMERA_IMAGE_RESPONSE:
       // Invalid
       break;
     case APIMessageType::SUBSCRIBE_LOGS_REQUEST: {
@@ -482,6 +496,14 @@ void APIConnection::read_message_(uint32_t size, uint32_t type, uint8_t *msg) {
       ExecuteServiceRequest req;
       req.decode(msg, size);
       this->on_execute_service_(req);
+      break;
+    }
+    case APIMessageType::CAMERA_IMAGE_REQUEST: {
+#ifdef USE_ESP32_CAMERA
+      CameraImageRequest req;
+      req.decode(msg, size);
+      this->on_camera_image_request_(req);
+#endif
       break;
     }
   }
@@ -694,6 +716,12 @@ bool APIConnection::send_buffer(APIMessageType type) {
 }
 
 void APIConnection::loop() {
+  if (!network_is_connected()) {
+    // when network is disconnected force disconnect immediately
+    // don't wait for timeout
+    this->fatal_error_();
+    return;
+  }
   if (this->client_->disconnected()) {
     // failsafe for disconnect logic
     this->on_disconnect_();
@@ -714,6 +742,31 @@ void APIConnection::loop() {
     this->sent_ping_ = true;
     this->send_ping_request();
   }
+
+#ifdef USE_ESP32_CAMERA
+  if (this->image_reader_.available()) {
+    uint32_t space = this->client_->space();
+    // reserve 15 bytes for metadata, and at least 64 bytes of data
+    if (space >= 15 + 64) {
+      uint32_t to_send = std::min(space - 15, this->image_reader_.available());
+      auto buffer = this->get_buffer();
+      // fixed32 key = 1;
+      buffer.encode_fixed32(1, global_esp32_camera->get_object_id_hash());
+      // bytes data = 2;
+      buffer.encode_bytes(2, this->image_reader_.peek_data_buffer(), to_send);
+      // bool done = 3;
+      bool done = this->image_reader_.available() == to_send;
+      buffer.encode_bool(3, done);
+      bool success = this->send_buffer(APIMessageType::CAMERA_IMAGE_RESPONSE);
+      if (success) {
+        this->image_reader_.consume_data(to_send);
+      }
+      if (success && done) {
+        this->image_reader_.return_image();
+      }
+    }
+  }
+#endif
 }
 
 #ifdef USE_BINARY_SENSOR
@@ -1012,6 +1065,31 @@ APIBuffer APIConnection::get_buffer() {
 }
 #ifdef USE_HOMEASSISTANT_TIME
 void APIConnection::send_time_request() { this->send_empty_message(APIMessageType::GET_TIME_REQUEST); }
+#endif
+
+#ifdef USE_ESP32_CAMERA
+void APIConnection::send_camera_state(std::shared_ptr<CameraImage> image) {
+  if (!this->state_subscription_)
+    return;
+  if (this->image_reader_.available())
+    return;
+  this->image_reader_.set_image(image);
+}
+#endif
+
+#ifdef USE_ESP32_CAMERA
+void APIConnection::on_camera_image_request_(const CameraImageRequest &req) {
+  if (global_esp32_camera == nullptr)
+    return;
+
+  ESP_LOGV(TAG, "on_camera_image_request_ stream=%s single=%s", YESNO(req.get_stream()), YESNO(req.get_single()));
+  if (req.get_single()) {
+    global_esp32_camera->request_image();
+  }
+  if (req.get_stream()) {
+    global_esp32_camera->request_stream();
+  }
+}
 #endif
 
 }  // namespace api
