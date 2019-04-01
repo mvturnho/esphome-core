@@ -91,6 +91,20 @@ MPR121Channel *MPR121Component::add_channel(binary_sensor::MPR121Channel *channe
   return channel;
 }
 
+MPR121Channel *MPR121Component::add_channel(const std::string &name, uint8_t channel_number) {
+  binary_sensor::MPR121Channel *channel = new binary_sensor::MPR121Channel(name, channel_number);
+  return this->add_channel(channel);
+}
+
+void MPR121Component::set_touch_threshold(uint8_t touch_threshold, uint8_t channel) {
+  ESP_LOGD(TAG, "set_touch_threshold -> tt: %d , chan:%d", touch_threshold);
+  this->write_byte(MPR121_TOUCHTH_0 + 2 * channel, touch_threshold);
+}
+
+void MPR121Component::set_release_threshold(uint8_t release_threshold, uint8_t channel) {
+  this->write_byte(MPR121_RELEASETH_0 + 2 * channel, release_threshold);
+}
+
 void MPR121Component::process_(uint16_t *data, uint16_t *last_data) {
   for (auto *channel : this->channels_) {
     channel->process(data, last_data);
