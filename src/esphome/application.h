@@ -55,6 +55,7 @@
 #include "esphome/fan/mqtt_fan_component.h"
 #include "esphome/io/mcp23017.h"
 #include "esphome/io/pcf8574_component.h"
+#include "esphome/io/sx1509_component.h"
 #include "esphome/light/addressable_light_effect.h"
 #include "esphome/light/fast_led_light_output.h"
 #include "esphome/light/light_color_values.h"
@@ -1128,6 +1129,10 @@ class Application {
    * @return The PCF8574Component instance to get individual pins.
    */
   io::PCF8574Component *make_pcf8574_component(uint8_t address = 0x21, bool pcf8575 = false);
+#endif
+
+#ifdef USE_SX1509
+  io::SX1509Component *make_sx1509_component(uint8_t address = 0x3E);
 #endif
 
 #ifdef USE_MCP23017

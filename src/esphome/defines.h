@@ -64,6 +64,7 @@
 #define USE_DEEP_SLEEP
 #define USE_PCF8574
 #define USE_MCP23017
+#define USE_SX1509
 #define USE_IO
 #define USE_SDS011
 #define USE_MPU6050
