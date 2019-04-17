@@ -40,7 +40,12 @@
 #include "esphome/binary_sensor/template_binary_sensor.h"
 #include "esphome/binary_sensor/mpr121_sensor.h"
 #include "esphome/binary_sensor/ttp229_lsf_sensor.h"
+#include "esphome/climate/bang_bang_climate.h"
+#include "esphome/climate/climate_device.h"
+#include "esphome/climate/mqtt_climate_component.h"
 #include "esphome/cover/cover.h"
+#include "esphome/cover/endstop_cover.h"
+#include "esphome/cover/time_based_cover.h"
 #include "esphome/cover/mqtt_cover_component.h"
 #include "esphome/cover/template_cover.h"
 #include "esphome/display/display.h"
@@ -1090,10 +1095,6 @@ class Application {
   void register_cover(cover::Cover *cover);
 #endif
 
-#ifdef USE_TEMPLATE_COVER
-  cover::TemplateCover *make_template_cover(const std::string &name);
-#endif
-
 #ifdef USE_A4988
   stepper::A4988 *make_a4988(const GPIOOutputPin &step_pin, const GPIOOutputPin &dir_pin);
 #endif
@@ -1101,6 +1102,10 @@ class Application {
 #ifdef USE_ULN2003
   stepper::ULN2003 *make_uln2003(const GPIOOutputPin &pin_a, const GPIOOutputPin &pin_b, const GPIOOutputPin &pin_c,
                                  const GPIOOutputPin &pin_d);
+#endif
+
+#ifdef USE_CLIMATE
+  void register_climate(climate::ClimateDevice *climate);
 #endif
 
   /*   _   _ _____ _     ____  _____ ____  ____

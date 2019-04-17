@@ -48,6 +48,9 @@ using namespace esphome::text_sensor;
 #ifdef USE_STEPPER
 using namespace esphome::stepper;
 #endif
+#ifdef USE_CLIMATE
+using namespace esphome::climate;
+#endif
 
 static const char *TAG = "application";
 
@@ -758,14 +761,6 @@ void Application::register_cover(cover::Cover *cover) {
 }
 #endif
 
-#ifdef USE_TEMPLATE_COVER
-TemplateCover *Application::make_template_cover(const std::string &name) {
-  auto *cover = this->register_component(new TemplateCover(name));
-  this->register_cover(cover);
-  return cover;
-}
-#endif
-
 #ifdef USE_REMOTE_TRANSMITTER
 remote::RemoteTransmitterComponent *Application::make_remote_transmitter_component(const GPIOOutputPin &output) {
   return this->register_component(new remote::RemoteTransmitterComponent(output.copy()));
@@ -1199,6 +1194,18 @@ io::MCP23017 *Application::make_mcp23017_component(uint8_t address) {
 #ifdef USE_SDS011
 sensor::SDS011Component *Application::make_sds011(UARTComponent *parent) {
   return this->register_component(new SDS011Component(parent));
+}
+#endif
+
+#ifdef USE_CLIMATE
+void Application::register_climate(climate::ClimateDevice *climate) {
+  for (auto *controller : this->controllers_)
+    controller->register_climate(climate);
+#ifdef USE_MQTT_CLIMATE
+  if (this->mqtt_client_ != nullptr) {
+    climate->set_mqtt(this->register_component(new climate::MQTTClimateComponent(climate)));
+  }
+#endif
 }
 #endif
 
